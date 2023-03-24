@@ -61,7 +61,7 @@ const controllerBy = {
  *                properties: 
  *                   refresh_token:
  *                      type: string
- *                      default: omariosouto
+ *                      default: dianarose
  *                      description: You have to login first to get a refresh token
  *     responses:
  *       200:
