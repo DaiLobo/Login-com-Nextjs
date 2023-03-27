@@ -1,3 +1,7 @@
+import { useRouter } from "next/router";
+
+import { useEffect, useState } from "react";
+
 import { authService } from "./authService";
 
 export function withSession(funcao) {
@@ -21,5 +25,46 @@ export function withSession(funcao) {
         },
       };
     }
+  };
+}
+
+export function useSession() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    authService
+      .getSession()
+      .then((response) => {
+        setSession(response);
+      })
+      .catch((error) => {
+        setError(error);
+      })
+      .finally(setLoading(false));
+  }, []);
+
+  return {
+    data: session,
+    error,
+    loading,
+  };
+}
+
+export function withSessionHOC(Component) {
+  return function Wrapper(props) {
+    const router = useRouter();
+    const { loading, error, data } = useSession();
+
+    if (error) {
+      router.push("/?error=401");
+    }
+
+    const modifiedProps = {
+      ...props,
+      session: data,
+    };
+    return <Component {...modifiedProps} />;
   };
 }
