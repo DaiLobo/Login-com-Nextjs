@@ -1,3 +1,5 @@
+import nookies from "nookies";
+
 import { tokenService } from "../../services/auth/tokenService";
 
 export const HttpClient = async (fetchUrl, fetchOptions) => {
@@ -21,31 +23,53 @@ export const HttpClient = async (fetchUrl, fetchOptions) => {
       if (!fetchOptions.refresh) return response;
       if (response.status !== 401) return response;
 
-      const refreshResponse = await HttpClient(
-        "http://localhost:3000/api/refresh",
-        {
-          method: "GET",
+      const isServer = Boolean(fetchOptions?.ctx);
+      const currentRefreshToken =
+        fetchOptions?.ctx?.req?.cookies["REFRESH_TOKEN_NAME"];
+
+      try {
+        const refreshResponse = await HttpClient(
+          "http://localhost:3000/api/refresh",
+          {
+            method: isServer ? "PUT" : "GET",
+            body: isServer ? { refresh_token: currentRefreshToken } : undefined,
+          }
+        );
+
+        const newAccessToken = refreshResponse.body.data.access_token;
+        const newRefreshToken = refreshResponse.body.data.refresh_token;
+
+        if (isServer) {
+          nookies.set(
+            fetchOptions?.ctx,
+            "REFRESH_TOKEN_NAME",
+            newRefreshToken,
+            {
+              httpOnly: true,
+              sameSite: "lax",
+              path: "/",
+            }
+          );
         }
-      );
 
-      const newAccessToken = refreshResponse.body.data.access_token;
-      const newRefreshToken = refreshResponse.body.data.refresh_token;
+        tokenService.save(newAccessToken);
 
-      tokenService.save(newAccessToken);
+        const retryResponse = await HttpClient(fetchUrl, {
+          ...fetchOptions,
+          headers: {
+            "Content-Type": "application/json",
+            ...fetchOptions.headers,
+          },
+          body: fetchOptions.body ? JSON.stringify(fetchOptions.body) : null,
+          refresh: false,
+          headers: {
+            Authorization: `Bearer ${newAccessToken}`,
+          },
+        });
 
-      const retryResponse = await HttpClient(fetchUrl, {
-        ...fetchOptions,
-        headers: {
-          "Content-Type": "application/json",
-          ...fetchOptions.headers,
-        },
-        body: fetchOptions.body ? JSON.stringify(fetchOptions.body) : null,
-        refresh: false,
-        headers: {
-          Authorization: `Bearer ${newAccessToken}`,
-        },
-      });
-
-      return retryResponse;
+        return retryResponse;
+      } catch (error) {
+        return response;
+      }
     });
 };

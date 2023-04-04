@@ -1,4 +1,5 @@
 import nookies from "nookies";
+
 import { HttpClient } from "../../src/infra/HttpClient/HttpClient";
 import { tokenService } from "../../src/services/auth/tokenService";
 
@@ -29,7 +30,7 @@ const controllers = {
   async regenerateTokens(req, res) {
     const ctx = { req, res };
     const cookies = nookies.get(ctx);
-    const refresh_token = cookies[REFRESH_TOKEN_NAME];
+    const refresh_token = cookies[REFRESH_TOKEN_NAME] || req.body.refresh_token;
 
     const refreshResponse = await HttpClient(
       `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session`,
@@ -70,6 +71,7 @@ const controllers = {
 const controllerBy = {
   POST: controllers.storeRefreshToken,
   GET: controllers.displayCookies,
+  PUT: controllers.regenerateTokens,
 };
 
 export default function handler(request, response) {
